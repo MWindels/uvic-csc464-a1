@@ -2,12 +2,11 @@
 #include <thread>
 #include <vector>
 #include <chrono>
-#include <string>
-#include <sstream>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #include <shared_mutex>
+#include "cpp/shared/parse.hpp"
 
 std::mutex output_mutex;	//This protects std::cout while the readers/writers are working.
 
@@ -136,17 +135,6 @@ void test_scenario(int total_readers, int total_writers){
 	}
 	
 	std::cout << "Final value: " << data << "\n";
-}
-
-int scan_int(){
-	int value;
-	std::string read_line;
-	std::getline(std::cin, read_line);
-	std::stringstream in_stream(read_line);
-	if(!(in_stream >> value)){
-		throw std::invalid_argument("Read a non-integer value from std::cin.");
-	}
-	return value;
 }
 
 int main(){

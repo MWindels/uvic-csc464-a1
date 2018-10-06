@@ -5,7 +5,7 @@ import (
 	"time"
 	"sync"
 	"math/rand"
-	"uvic-csc464-a1/src/go/shared/parse"	//Requires that your GOPATH include the directory which contains this repo.
+	"go/shared/parse"	//Requires that your GOPATH include the directory which contains this repo.
 )
 
 func reader(id int, data *int, lock *sync.RWMutex, done chan<- bool) {
