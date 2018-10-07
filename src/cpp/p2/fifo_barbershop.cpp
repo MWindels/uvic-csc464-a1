@@ -21,7 +21,7 @@ struct customer_info{
 void customer(int id, ts_queue<customer_info>& queue){
 	semaphore sem;
 	customer_info info(id, &sem);
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//Walk to the barbershop...
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10000));	//Walk to the barbershop...
 	
 	if(queue.enqueue(info)){	//Shop is not full, enter.
 		output_mutex.lock();
