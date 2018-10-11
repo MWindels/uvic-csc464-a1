@@ -10,75 +10,13 @@
 
 std::mutex output_mutex;	//This protects std::cout while the readers/writers are working.
 
-/*class rw_mutex{
-public:
-	//Constructors/Destructor
-	rw_mutex() = default;
-	rw_mutex(const rw_mutex&) = delete;
-	rw_mutex(rw_mutex&& other) = delete;
-	~rw_mutex() = default;
-	
-	//Assignment Operators
-	rw_mutex& operator=(const rw_mutex&) = delete;
-	rw_mutex& operator=(rw_mutex&&) = delete;
-	
-	//Read Lock/Unlock
-	void r_lock();
-	void r_unlock();
-	
-	//Write Lock/Unlock
-	void lock();
-	void unlock();
-
-private:
-	//Lightswitch Components
-	int readers;
-	std::mutex no_readers;
-	std::mutex self_lock;
-	
-	//Turnstile
-	std::mutex turnstile;
-
-};
-
-void rw_mutex::r_lock(){
-	turnstile.lock();
-	turnstile.unlock();
-	
-	self_lock.lock();
-	if(readers++ == 0){
-		no_readers.lock();
-	}
-	self_lock.unlock();
-}
-
-void rw_mutex::r_unlock(){
-	self_lock.lock();
-	if(--readers == 0){
-		no_readers.unlock();
-	}
-	self_lock.unlock();
-}
-
-void rw_mutex::lock(){
-	turnstile.lock();
-	no_readers.lock();
-}
-
-void rw_mutex::unlock(){
-	turnstile.unlock();
-	no_readers.unlock();
-}*/
-
 void reader(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
 	int value;
 	
-	//lock->r_lock();
 	lock->lock_shared();
 	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));
 	value = *data;
 	lock->unlock_shared();
-	//lock->r_unlock();
 	
 	output_mutex.lock();
 	std::cout << "(Reader " << id << ") Read " << value << "\n";
@@ -88,13 +26,11 @@ void reader(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
 void writer(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
 	int value;
 	
-	//lock->lock();
 	lock->lock();
 	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));
 	value = *data + 1;
 	*data = value;
 	lock->unlock();
-	//lock->unlock();
 	
 	output_mutex.lock();
 	std::cout << "(Writer " << id << ") Wrote " << value << "\n";
@@ -103,7 +39,6 @@ void writer(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
 
 void test_scenario(int total_readers, int total_writers){
 	int data = 0;
-	//rw_mutex lock;
 	std::shared_mutex lock;
 	
 	std::vector<std::thread> readers(total_readers);

@@ -8,7 +8,7 @@
 
 struct shared_lists{
 	
-	std::list<std::list<int>> sieve_data;
+	std::list<std::list<int>> sieve_data;	//These lists are used specifically so that iterators are not invalidated after insertions.
 	std::list<semaphore> sieve_sems;
 
 };
@@ -26,7 +26,7 @@ void sieve(std::list<std::list<int>>::iterator input, std::list<semaphore>::iter
 	input_notify->wait();
 	int prime = *(input->begin());
 	
-	primes.push_back(prime);	//Doesn't need a mutex, no two threads will ever excute this at the same time.  The thread which created this one has already added its prime.
+	primes.push_back(prime);	//Doesn't need a mutex, no two threads will ever excute this at the same time.  The thread which created this one already added its prime before spinning off this thread.
 	
 	shared_data.sieve_data.push_back(std::list<int>());	//Likewise with this little block, and for exactly the same reasons.
 	shared_data.sieve_sems.emplace_back(0);
@@ -93,7 +93,6 @@ void test_scenario(int n){
 }
 
 int main(){
-	std::srand(std::time(0));
 	try{
 		std::cout << "Please input which number to print the primes up to: ";
 		int max = scan_int();

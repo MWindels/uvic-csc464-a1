@@ -3,8 +3,10 @@
 void semaphore::wait(){
 	std::unique_lock lk(lock);
 	
+	if(value == 0){
+		waiter.wait(lk, [=](){return value > 0;});
+	}
 	--value;
-	waiter.wait(lk, [=](){return value >= 0;});
 }
 
 void semaphore::signal(){

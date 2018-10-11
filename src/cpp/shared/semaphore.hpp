@@ -8,7 +8,7 @@ class semaphore{
 public:
 	
 	//Constructors/Destructor.
-	semaphore(int i = 0) : lock(), waiter(), value(i) {}
+	semaphore(int i = 0) : lock(), waiter(), value(i >= 0 ? i : 0) {}
 	semaphore(const semaphore&) = delete;
 	semaphore(semaphore&&) = delete;
 	~semaphore() = default;
