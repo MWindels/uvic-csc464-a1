@@ -12,14 +12,49 @@
 
 std::mutex output_lock;
 
-class cart;
 class park;
+class cart;
+
+class park{
+public:
+	
+	//Constructors/Destructor.
+	park(cart* cars, int n);
+	park(const park&) = delete;
+	park(park&&) = delete;
+	~park() = default;
+	
+	//Assignment Operators.
+	park& operator=(const park&) = delete;
+	park& operator=(park&&) = delete;
+	
+	//Park Interaction Functions.
+	cart* queue_for_car();
+
+private:
+	
+	//Car-Only Interaction Functions.
+	void start_car();
+	void return_car();
+	
+	friend cart;
+	friend void car(cart& me, park& the_park);
+	
+	mutable std::mutex lock;
+	mutable semaphore has_car_ready;
+	
+	std::queue<cart*> waiting_cars;
+	std::queue<cart*> running_cars;
+	cart* loading_car;
+	cart* unloading_car;
+
+};
 
 class cart{
 public:
 	
 	//Constructors/Destructor.
-	cart(int i, int c) : unload_ready(0), lock(), is_full(), is_empty(), passenger_holder(0), id(i), capacity(c), passengers(0) {}
+	cart(int i, int c) : lock(), is_full(), is_empty(), passenger_holder(0), unload_ready(0), id(i), capacity(c), passengers(0) {}
 	cart(const cart&) = delete;
 	cart(cart&&) = delete;
 	~cart() = default;
@@ -36,8 +71,6 @@ public:
 	bool board(int pass_id);
 	void ride();
 	void unboard(int pass_id);
-	
-	mutable semaphore unload_ready;	//Unfortunately, has to be public for the park to access it.
 
 private:
 	
@@ -47,17 +80,26 @@ private:
 	void unload();
 	
 	friend void car(cart& me, park& the_park);
+	friend void park::start_car();
+	friend void park::return_car();
 	
 	mutable std::mutex lock;
 	mutable std::condition_variable is_full;
 	mutable std::condition_variable is_empty;
 	mutable semaphore passenger_holder;
+	mutable semaphore unload_ready;
 	
 	const int id;
 	const int capacity;
 	int passengers;
 
 };
+
+
+
+
+
+//----------Cart Functions----------
 
 void cart::load(){
 	std::unique_lock lk(lock);
@@ -122,39 +164,7 @@ void cart::unboard(int pass_id){
 
 
 
-class park{
-public:
-	
-	//Constructors/Destructor.
-	park(cart* cars, int n);
-	park(const park&) = delete;
-	park(park&&) = delete;
-	~park() = default;
-	
-	//Assignment Operators.
-	park& operator=(const park&) = delete;
-	park& operator=(park&&) = delete;
-	
-	//Park Interaction Functions.
-	cart* queue_for_car();
-
-private:
-	
-	//Car-Only Interaction Functions.
-	void start_car();
-	void return_car();
-	
-	friend void car(cart& me, park& the_park);
-	
-	mutable std::mutex lock;
-	mutable semaphore has_car_ready;
-	
-	std::queue<cart*> waiting_cars;
-	std::queue<cart*> running_cars;
-	cart* loading_car;
-	cart* unloading_car;
-
-};
+//----------Park Functions----------
 
 park::park(cart* cars, int n) : lock(), has_car_ready(0), waiting_cars(), running_cars(), loading_car(NULL), unloading_car(NULL) {
 	if(n > 0){
@@ -225,6 +235,8 @@ cart* park::queue_for_car(){
 
 
 
+//----------Thread Functions----------
+
 void car(cart& me, park& the_park){
 	while(true){
 		me.load();
@@ -279,7 +291,7 @@ int main(){
 			if(cars >= 0){
 				std::cout << "Please input how many seats there are in the roller coaster cars: ";
 				int seats = scan_int();
-				if(seats < passengers){
+				if(0 <= seats && seats < passengers){
 					test_scenario(passengers, cars, seats);
 				}else{
 					throw std::invalid_argument("Please input a positive integer less than the number of passengers, and nothing else.");
