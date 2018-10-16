@@ -8,11 +8,12 @@ import (
 )
 
 func customer(id int, queue chan<- int, notify <-chan bool, done chan<- bool) {
-	time.Sleep(time.Duration(rand.Intn(10000)) * time.Millisecond)		//Walk to the barbershop...
+	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)		//Walk to the barbershop...
 	
 	select {
 	case queue <- id:	//Shop is not full, enter.
-		fmt.Printf("(Customer %d) Enters.\n", id)
+		fmt.Printf("(Customer %d) Arrives.\n", id)
+		
 		<- notify	//Wait until barber calls you up.
 		//Get hair cut...
 		<- notify	//Wait until barber is done.
@@ -29,7 +30,7 @@ func barber(queue <-chan int, notifiers [](chan bool)) {
 		notifiers[customer] <- true		//Call customer up.
 		
 		fmt.Printf("(Barber) Customer %d!\n", customer)
-		time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)	//Cut their hair...
+		time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)	//Cut their hair...
 		fmt.Printf("(Barber) All done, customer %d.\n", customer)
 		
 		notifiers[customer] <- true		//Tell customer they're done.
@@ -44,6 +45,8 @@ func testScenario(totalCustomers, shopCapacity int) {
 	}
 	done := make(chan bool)
 	
+	//start := time.Now()
+	
 	go barber(queue, notifiers)
 	for i := 0; i < totalCustomers; i++ {
 		go customer(i, queue, notifiers[i], done)
@@ -52,6 +55,8 @@ func testScenario(totalCustomers, shopCapacity int) {
 	for i := 0; i < totalCustomers; i++ {
 		<- done
 	}
+	
+	//fmt.Printf("%d\n", time.Since(start))
 }
 
 func main() {

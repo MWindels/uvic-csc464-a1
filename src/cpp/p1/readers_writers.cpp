@@ -8,33 +8,57 @@
 #include <shared_mutex>
 #include "cpp/shared/parse.hpp"
 
+typedef std::chrono::steady_clock testing_clock;
+
 std::mutex output_mutex;	//This protects std::cout while the readers/writers are working.
 
-void reader(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
-	int value;
-	
+void reader(int id, int* data, std::shared_mutex* lock){
+	//testing_clock::time_point start = testing_clock::now();
 	lock->lock_shared();
+	//testing_clock::time_point end = testing_clock::now();
+	
+	output_mutex.lock();
+	std::cout << "(Reader " << id << ") Begins reading...\n";
+	output_mutex.unlock();
+	
 	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));
-	value = *data;
+	
+	int value = *data;
+	++value;
+	
+	output_mutex.lock();
+	std::cout << "(Reader " << id << ") Read " << *data << ".\n";
+	output_mutex.unlock();
+	
 	lock->unlock_shared();
 	
-	output_mutex.lock();
-	std::cout << "(Reader " << id << ") Read " << value << "\n";
-	output_mutex.unlock();
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << "\n";
+	output_mutex.unlock();*/
 }
 
-void writer(int id, int* data, /*rw_mutex* lock*/ std::shared_mutex* lock){
-	int value;
-	
+void writer(int id, int* data, std::shared_mutex* lock){
+	//testing_clock::time_point start = testing_clock::now();
 	lock->lock();
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));
-	value = *data + 1;
-	*data = value;
-	lock->unlock();
+	//testing_clock::time_point end = testing_clock::now();
 	
 	output_mutex.lock();
-	std::cout << "(Writer " << id << ") Wrote " << value << "\n";
+	std::cout << "(Writer " << id << ") Begins writing...\n";
 	output_mutex.unlock();
+	
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));
+	
+	*data = *data + 1;
+	
+	output_mutex.lock();
+	std::cout << "(Writer " << id << ") Wrote " << *data << ".\n";
+	output_mutex.unlock();
+	
+	lock->unlock();
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << "\n";
+	output_mutex.unlock();*/
 }
 
 void test_scenario(int total_readers, int total_writers){
@@ -45,8 +69,9 @@ void test_scenario(int total_readers, int total_writers){
 	std::vector<std::thread> writers(total_writers);
 	
 	for(int i = 0, j = 0; i < total_readers || j < total_writers;){
+		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 5));
 		if(i < total_readers && j < total_writers){
-			if(std::rand() % (1 + total_readers / (total_writers + 1))){
+			if(std::rand() % 2 == 0){
 				readers.push_back(std::thread(reader, i++, &data, &lock));
 			}else{
 				writers.push_back(std::thread(writer, j++, &data, &lock));
@@ -69,7 +94,7 @@ void test_scenario(int total_readers, int total_writers){
 		}
 	}
 	
-	std::cout << "Final value: " << data << "\n";
+	//std::cout << "Final value: " << data << "\n";
 }
 
 int main(){

@@ -9,6 +9,8 @@
 #include "cpp/shared/ts_queue.hpp"
 #include "cpp/shared/semaphore.hpp"
 
+typedef std::chrono::steady_clock testing_clock;
+
 std::mutex output_mutex;
 
 struct customer_info{
@@ -21,11 +23,11 @@ struct customer_info{
 void customer(int id, ts_queue<customer_info>& queue){
 	semaphore sem;
 	customer_info info(id, &sem);
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10000));	//Walk to the barbershop...
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 100));	//Walk to the barbershop...
 	
 	if(queue.enqueue(info)){	//Shop is not full, enter.
 		output_mutex.lock();
-		std::cout << "(Customer " << id << ") Enters.\n";	//This isn't perfect, one thread could get the lock first, even though the other go into the queue first.
+		std::cout << "(Customer " << id << ") Arrives.\n";	//This isn't perfect, one thread could get the lock first, even though the other go into the queue first.
 		output_mutex.unlock();
 		
 		sem.wait();	//Wait until barber calls you up.
@@ -46,7 +48,7 @@ void barber(ts_queue<customer_info>& queue){
 		output_mutex.lock();
 		std::cout << "(Barber) Customer " << next.id << "!\n";
 		output_mutex.unlock();
-		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//Cut their hair...
+		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));	//Cut their hair...
 		output_mutex.lock();
 		std::cout << "(Barber) All done, customer " << next.id << ".\n";
 		output_mutex.unlock();
@@ -57,6 +59,8 @@ void barber(ts_queue<customer_info>& queue){
 
 void test_scenario(int total_customers, int shop_capacity){
 	ts_queue<customer_info> queue(shop_capacity);
+	
+	//testing_clock::time_point start = testing_clock::now();
 	
 	std::thread barber_thread(barber, std::ref(queue));
 	std::vector<std::thread> customers(total_customers);
@@ -69,6 +73,8 @@ void test_scenario(int total_customers, int shop_capacity){
 			i->join();
 		}
 	}
+	
+	//std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
 	
 	queue.close();
 	if(barber_thread.joinable()){

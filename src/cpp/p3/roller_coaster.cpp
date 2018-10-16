@@ -10,7 +10,9 @@
 #include "cpp/shared/parse.hpp"
 #include "cpp/shared/semaphore.hpp"
 
-std::mutex output_lock;
+typedef std::chrono::steady_clock testing_clock;
+
+std::mutex output_mutex;
 
 class park;
 class cart;
@@ -54,7 +56,7 @@ class cart{
 public:
 	
 	//Constructors/Destructor.
-	cart(int i, int c) : lock(), is_full(), is_empty(), passenger_holder(0), unload_ready(0), id(i), capacity(c), passengers(0) {}
+	cart(int i, int c) : lock(), is_full(), is_empty(), passenger_holder(0), unload_ready(0), id(i), capacity(c), terminated(false), passengers(0) {}
 	cart(const cart&) = delete;
 	cart(cart&&) = delete;
 	~cart() = default;
@@ -71,11 +73,14 @@ public:
 	bool board(int pass_id);
 	void ride();
 	void unboard(int pass_id);
+	
+	//Other Functions.
+	void terminate();
 
 private:
 	
 	//Car-only Functions.
-	void load();
+	bool load();
 	void run();
 	void unload();
 	
@@ -91,33 +96,33 @@ private:
 	
 	const int id;
 	const int capacity;
+	bool terminated;
 	int passengers;
 
 };
 
 
 
-
-
 //----------Cart Functions----------
 
-void cart::load(){
+bool cart::load(){
 	std::unique_lock lk(lock);
 	
-	is_full.wait(lk, [=](){return passengers == capacity;});
+	is_full.wait(lk, [=](){return passengers == capacity || terminated;});
+	return !terminated;
 }
 
 void cart::run(){
-	output_lock.lock();
+	output_mutex.lock();
 	std::cout << "(Car " << id << ") Now running...\n";
-	output_lock.unlock();
+	output_mutex.unlock();
 	
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 5000));	
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));	
 	unload_ready.wait();
 	
-	output_lock.lock();
+	output_mutex.lock();
 	std::cout << "(Car " << id << ") Finished.\n";
-	output_lock.unlock();
+	output_mutex.unlock();
 }
 
 void cart::unload(){
@@ -137,9 +142,9 @@ bool cart::board(int pass_id){
 		if(++passengers == capacity){
 			is_full.notify_one();
 		}
-		output_lock.lock();
+		output_mutex.lock();
 		std::cout << "(Passenger " << pass_id << ") Boards car " << id << ".\n";
-		output_lock.unlock();
+		output_mutex.unlock();
 		return true;
 	}
 	return false;
@@ -155,12 +160,17 @@ void cart::unboard(int pass_id){
 	if(--passengers == 0){
 		is_empty.notify_one();
 	}
-	output_lock.lock();
+	output_mutex.lock();
 	std::cout << "(Passenger " << pass_id << ") Disembarks from car " << id << ".\n";
-	output_lock.unlock();
+	output_mutex.unlock();
 }
 
-
+void cart::terminate(){
+	std::unique_lock lk(lock);
+	
+	terminated = true;
+	is_full.notify_one();
+}
 
 
 
@@ -233,13 +243,10 @@ cart* park::queue_for_car(){
 
 
 
-
-
 //----------Thread Functions----------
 
 void car(cart& me, park& the_park){
-	while(true){
-		me.load();
+	while(me.load()){
 		the_park.start_car();
 		me.run();
 		me.unload();
@@ -261,11 +268,12 @@ void test_scenario(int total_passengers, int total_cars, int total_seats){
 	}
 	park the_park(the_cars, total_cars);
 	
+	//testing_clock::time_point start = testing_clock::now();
+	
 	std::vector<std::thread> cars;
 	std::vector<std::thread> passengers;
 	for(int i = 0; i < total_cars; ++i){
 		cars.push_back(std::thread(car, std::ref(the_cars[i]), std::ref(the_park)));
-		(--cars.end())->detach();
 	}
 	for(int i = 0; i < total_passengers; ++i){
 		passengers.push_back(std::thread(passenger, i, std::ref(the_park)));
@@ -277,7 +285,18 @@ void test_scenario(int total_passengers, int total_cars, int total_seats){
 		}
 	}
 	
-	delete [] the_cars;
+	//std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	
+	for(int i = 0; i < total_cars; ++i){
+		the_cars[i].terminate();
+	}
+	for(auto i = cars.begin(); i != cars.end(); ++i){
+		if(i->joinable()){
+			i->join();
+		}
+	}
+	
+	delete [] reinterpret_cast<char*>(the_cars);
 }
 
 int main(){
@@ -291,10 +310,10 @@ int main(){
 			if(cars >= 0){
 				std::cout << "Please input how many seats there are in the roller coaster cars: ";
 				int seats = scan_int();
-				if(0 <= seats && seats < passengers){
+				if(0 <= seats && seats <= passengers){
 					test_scenario(passengers, cars, seats);
 				}else{
-					throw std::invalid_argument("Please input a positive integer less than the number of passengers, and nothing else.");
+					throw std::invalid_argument("Please input a positive integer less than or equal to the number of passengers, and nothing else.");
 				}
 			}else{
 				throw std::invalid_argument("Please input a single natural number, and nothing else.");

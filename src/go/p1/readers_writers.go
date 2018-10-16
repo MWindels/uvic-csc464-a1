@@ -9,27 +9,37 @@ import (
 )
 
 func reader(id int, data *int, lock *sync.RWMutex, done chan<- bool) {
-	var value int
-	
+	//start := time.Now()
 	lock.RLock()
+	//totalTime := time.Since(start)
+	
+	fmt.Printf("(Reader %d) Begins reading...\n", id)
 	time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)
-	value = *data
+	value := *data
+	value++
+	fmt.Printf("(Reader %d) Read %d.\n", id, *data)
+	
 	lock.RUnlock()
 	
-	fmt.Printf("(Reader %d) Read %d\n", id, value)
+	//fmt.Printf("%d\n", totalTime.Nanoseconds())
+	
 	done <- true
 }
 
 func writer(id int, data *int, lock *sync.RWMutex, done chan<- bool) {
-	var value int
-	
+	//start := time.Now()
 	lock.Lock()
+	//totalTime := time.Since(start)
+	
+	fmt.Printf("(Writer %d) Begins writing...\n", id)
 	time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)
-	value = *data + 1
-	*data = value
+	*data = *data + 1
+	fmt.Printf("(Writer %d) Wrote %d.\n", id, *data)
+	
 	lock.Unlock()
 	
-	fmt.Printf("(Writer %d) Wrote %d\n", id, value)
+	//fmt.Printf("%d\n", totalTime.Nanoseconds())
+	
 	done <- true
 }
 
@@ -39,8 +49,9 @@ func testScenario(totalReaders, totalWriters int) {
 	done := make(chan bool)
 	
 	for i, j := 0, 0; i < totalReaders || j < totalWriters; {
+		time.Sleep(time.Duration(rand.Intn(5)) * time.Millisecond)
 		if i < totalReaders && j < totalWriters {
-			if rand.Intn(1 + totalReaders / (totalWriters + 1)) != 0 {
+			if rand.Intn(2) == 0 {
 				go reader(i, &data, &lock, done)
 				i++
 			}else{
@@ -59,7 +70,7 @@ func testScenario(totalReaders, totalWriters int) {
 	for i := 0; i < totalReaders + totalWriters; i++ {
 		<- done
 	}
-	fmt.Printf("Final value: %d\n", data)
+	//fmt.Printf("Final value: %d\n", data)
 }
 
 func main() {
@@ -77,8 +88,3 @@ func main() {
 		fmt.Println("Please input a single natural number, and nothing else.")
 	}
 }
-
-//was non-alignment a pragmatic (realpolitik) descision, or was it planned?
-//was tito pragmatic or ideologically motivated? (non-alignment and the tito-stalin splits would suggest pragmatic)
-	//when did this change? (tito-stalin split?  earlier even?)
-	//did this stay the same throughout his life? (yugoslavia did move away from non-alignment later according to a book in the library)

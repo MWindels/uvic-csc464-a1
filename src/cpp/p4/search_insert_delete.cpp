@@ -9,92 +9,161 @@
 #include <shared_mutex>
 #include "cpp/shared/parse.hpp"
 
+typedef std::chrono::steady_clock testing_clock;
+
 std::mutex output_mutex;
 
-std::list<int>::iterator find(int x, std::list<int>& ctnr){
-	for(auto i = ctnr.begin(); i != ctnr.end(); ++i){
-		if(*i == x){
-			return i;
+struct container{
+	
+	//Constructors/Destructor.
+	container() : delete_lock(), insert_lock(), size_lock(), ctnr() {}
+	container(const container&) = delete;
+	container(container&&) = delete;
+	~container() = default;
+	
+	//Assignment Operators.
+	container& operator=(const container&) = delete;
+	container& operator=(container&&) = delete;
+	
+	//Container Functions.
+	std::list<int>::iterator find(int x);
+	
+	//Synchronization Members.
+	std::shared_mutex delete_lock;
+	std::mutex insert_lock;
+	std::mutex size_lock;
+	
+	//Mutable Members.
+	std::list<int> ctnr;
+
+};
+
+std::list<int>::iterator container::find(int x){
+	size_lock.lock();
+	int size = ctnr.size();
+	size_lock.unlock();
+	
+	auto item = ctnr.begin();
+	for(int i = 0; i < size; ++i){
+		if(*item == x){
+			return item;
 		}
+		++item;
 	}
-	return ctnr.end();
+	throw std::range_error("The element is not in the list.");
 }
 
-void searcher(int id, std::list<int>& ctnr, std::shared_mutex& delete_lock){
-	std::shared_lock<std::shared_mutex> del_lk(delete_lock);
+void searcher(int id, container& c){
+	std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	//testing_clock::time_point start = testing_clock::now();
 	
-	if(find(id, ctnr) != ctnr.end()){
+	std::shared_lock<std::shared_mutex> del_lk(c.delete_lock);
+	
+	try{
+		c.find(id);
+		
+		output_mutex.lock();
 		std::cout << "(Searcher " << id << ") Found element {" << id << "}.\n";
-	}else{
+		output_mutex.unlock();
+	}catch(const std::range_error& ex){
+		output_mutex.lock();
 		std::cout << "(Searcher " << id << ") Did not find element {" << id << "}!\n";
+		output_mutex.unlock();
 	}
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
 }
 
-void inserter(int id, std::list<int>& ctnr, std::shared_mutex& delete_lock, std::mutex& insert_lock){
-	std::shared_lock<std::shared_mutex> del_lk(delete_lock);
-	std::unique_lock ins_lk(insert_lock);
+void inserter(int id, container& c){
+	std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	//testing_clock::time_point start = testing_clock::now();
 	
-	ctnr.push_back(id);
+	std::shared_lock<std::shared_mutex> del_lk(c.delete_lock);
+	std::unique_lock ins_lk(c.insert_lock);
+	
+	c.size_lock.lock();
+	c.ctnr.push_back(id);
+	c.size_lock.unlock();
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
+	
+	output_mutex.lock();
 	std::cout << "(Inserter " << id << ") Added element {" << id << "}.\n";
+	output_mutex.unlock();
 }
 
-void deleter(int id, std::list<int>& ctnr, std::shared_mutex& delete_lock){
-	std::unique_lock<std::shared_mutex> del_lk(delete_lock);
+void deleter(int id, container& c){
+	std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	//testing_clock::time_point start = testing_clock::now();
 	
-	std::list<int>::iterator elem = find(id, ctnr);
-	if(elem != ctnr.end()){
-		ctnr.erase(elem);
+	std::unique_lock<std::shared_mutex> del_lk(c.delete_lock);
+	
+	try{
+		std::list<int>::iterator elem = c.find(id);
+		c.ctnr.erase(elem);
+		
+		output_mutex.lock();
 		std::cout << "(Deleter " << id << ") Removed element {" << id << "}.\n";
-	}else{
+		output_mutex.unlock();
+	}catch(const std::range_error& ex){
+		output_mutex.lock();
 		std::cout << "(Deleter " << id << ") Did not find element {" << id << "}!\n";
+		output_mutex.unlock();
 	}
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
 }
 
 void test_scenario(int total_searchers, int total_inserters, int total_deleters){
-	std::list<int> ctnr;
-	std::shared_mutex delete_lock;
-	std::mutex insert_lock;
+	container the_container;
 	
 	std::vector<std::thread> searchers;
 	std::vector<std::thread> inserters;
 	std::vector<std::thread> deleters;
 	
 	for(int i = 0, j = 0, k = 0; i + j + k < total_searchers + total_inserters + total_deleters; ){
-		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 100));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 5));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		if(i < total_searchers && j < total_inserters && k < total_deleters){
 			if(std::rand() % 3 == 0){
-				searchers.push_back(std::thread(searcher, i++, std::ref(ctnr), std::ref(delete_lock)));
+				searchers.push_back(std::thread(searcher, i++, std::ref(the_container)));
 			}else{
 				if(std::rand() % 2 == 0){
-					inserters.push_back(std::thread(inserter, j++, std::ref(ctnr), std::ref(delete_lock), std::ref(insert_lock)));
+					inserters.push_back(std::thread(inserter, j++, std::ref(the_container)));
 				}else{
-					deleters.push_back(std::thread(deleter, k++, std::ref(ctnr), std::ref(delete_lock)));
+					deleters.push_back(std::thread(deleter, k++, std::ref(the_container)));
 				}
 			}
 		}else if(i < total_searchers && j < total_inserters){
 			if(std::rand() % 2 == 0){
-				searchers.push_back(std::thread(searcher, i++, std::ref(ctnr), std::ref(delete_lock)));
+				searchers.push_back(std::thread(searcher, i++, std::ref(the_container)));
 			}else{
-				inserters.push_back(std::thread(inserter, j++, std::ref(ctnr), std::ref(delete_lock), std::ref(insert_lock)));
+				inserters.push_back(std::thread(inserter, j++, std::ref(the_container)));
 			}
 		}else if(i < total_searchers && k < total_deleters){
 			if(std::rand() % 2 == 0){
-				searchers.push_back(std::thread(searcher, i++, std::ref(ctnr), std::ref(delete_lock)));
+				searchers.push_back(std::thread(searcher, i++, std::ref(the_container)));
 			}else{
-				deleters.push_back(std::thread(deleter, k++, std::ref(ctnr), std::ref(delete_lock)));
+				deleters.push_back(std::thread(deleter, k++, std::ref(the_container)));
 			}
 		}else if(j < total_inserters && k < total_deleters){
 			if(std::rand() % 2 == 0){
-				inserters.push_back(std::thread(inserter, j++, std::ref(ctnr), std::ref(delete_lock), std::ref(insert_lock)));
+				inserters.push_back(std::thread(inserter, j++, std::ref(the_container)));
 			}else{
-				deleters.push_back(std::thread(deleter, k++, std::ref(ctnr), std::ref(delete_lock)));
+				deleters.push_back(std::thread(deleter, k++, std::ref(the_container)));
 			}
 		}else if(i < total_searchers){
-			searchers.push_back(std::thread(searcher, i++, std::ref(ctnr), std::ref(delete_lock)));
+			searchers.push_back(std::thread(searcher, i++, std::ref(the_container)));
 		}else if(j < total_inserters){
-			inserters.push_back(std::thread(inserter, j++, std::ref(ctnr), std::ref(delete_lock), std::ref(insert_lock)));
+			inserters.push_back(std::thread(inserter, j++, std::ref(the_container)));
 		}else if(k < total_deleters){
-			deleters.push_back(std::thread(deleter, k++, std::ref(ctnr), std::ref(delete_lock)));
+			deleters.push_back(std::thread(deleter, k++, std::ref(the_container)));
 		}
 	}
 	

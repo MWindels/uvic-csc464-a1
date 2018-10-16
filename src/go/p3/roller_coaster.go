@@ -41,8 +41,6 @@ type park struct {
 
 
 
-
-
 //----------Cart Functions----------
 
 func initCart(i, c int) cart {
@@ -69,7 +67,7 @@ func (c cart) load() {
 
 func (c cart) run() {
 	fmt.Printf("(Car %d) Now running...\n", c.id)
-	time.Sleep(time.Duration(rand.Intn(5000)) * time.Millisecond)
+	time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)
 	<- c.unloadReady
 	fmt.Printf("(Car %d) Finished.\n", c.id)
 }
@@ -97,8 +95,6 @@ func (c cart) unboard(passId int) {
 	fmt.Printf("(Passenger %d) Disembarks from car %d.\n", passId, c.id)
 	c.leaveCar <- true
 }
-
-
 
 
 
@@ -190,8 +186,6 @@ func (p *park) queueForCar() cart {
 
 
 
-
-
 //----------Thread Functions----------
 
 func car(me cart, thePark *park) {
@@ -222,6 +216,8 @@ func testScenario(totalPassengers, totalCars, totalSeats int) {
 	done := make(chan bool)
 	initPark(&thePark, theCars)
 	
+	//start := time.Now()
+	
 	for i := 0; i < totalCars; i++ {
 		go car(theCars[i], &thePark)
 	}
@@ -232,6 +228,8 @@ func testScenario(totalPassengers, totalCars, totalSeats int) {
 	for i := 0; i < totalPassengers; i++ {
 		<- done
 	}
+	
+	//fmt.Printf("%d\n", time.Since(start).Nanoseconds())
 }
 
 func main() {
@@ -242,10 +240,10 @@ func main() {
 		fmt.Print("Please input how many roller coaster car threads to run: ")
 		if cars, carsErr := parse.ScanInt(); !carsErr && cars >= 0 {
 			fmt.Print("Please input how many seats there are in the roller coaster cars: ")
-			if seats, seatsErr := parse.ScanInt(); !seatsErr && seats >= 0 && seats < passengers {
+			if seats, seatsErr := parse.ScanInt(); !seatsErr && seats >= 0 && seats <= passengers {
 				testScenario(passengers, cars, seats)
 			}else{
-				fmt.Println("Please input a positive integer less than the number of passengers, and nothing else.")
+				fmt.Println("Please input a positive integer less than of equal to the number of passengers, and nothing else.")
 			}
 		}else{
 			fmt.Println("Please input a single natural number, and nothing else.")
