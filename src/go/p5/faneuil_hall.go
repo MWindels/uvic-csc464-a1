@@ -42,7 +42,9 @@ func initHall(totalImmigrants int) hall {
 //----------Immigrant Functions----------
 
 func (h *hall) enterImmigrant(id int) {
+	//start := time.Now()
 	<- h.tryEnter
+	//fmt.Printf("%d\n", time.Since(start).Nanoseconds())
 	h.entered++
 	fmt.Printf("(Immigrant %d) Arrives.\n", id)
 	h.tryEnter <- true
@@ -86,10 +88,13 @@ func (h hall) confirm() {
 		<- h.notifyCheckIn
 	}
 	fmt.Printf("(The Judge) Begins the confirmation process.\n")
+	
+	//start := time.Now()
 	for i := 0; i < h.entered; i++ {
 		h.swearOath <- true
 		h.certification <- true
 	}
+	//fmt.Printf("%d\n", time.Since(start).Nanoseconds())
 }
 
 func (h *hall) leaveJudge() int {
@@ -107,14 +112,16 @@ func (h *hall) leaveJudge() int {
 //----------Spectator Functions----------
 
 func (h hall) enterSpectator(id int) {
+	//start := time.Now()
 	<- h.tryEnter
+	//fmt.Printf("%d\n", time.Since(start).Nanoseconds())
 	fmt.Printf("(Spectator %d) Arrives.\n", id)
 	h.tryEnter <- true
 }
 
 func (h hall) spectate(id int) {
 	fmt.Printf("(Spectator %d) Spectates.\n", id)
-	time.Sleep(time.Duration(rand.Intn(7500)) * time.Millisecond)
+	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
 }
 
 func (h hall) leaveSpectator(id int) {
@@ -128,9 +135,9 @@ func (h hall) leaveSpectator(id int) {
 func immigrant(id int, fh *hall, done chan bool) {
 	defer func(){done <- true}()
 	
-	time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)	//In transit.
+	time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)	//In transit.
 	fh.enterImmigrant(id)
-	time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)	//Find way to check-in.
+	time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond)	//Find way to check-in.
 	fh.checkIn(id)
 	fh.swear(id)
 	fh.leaveImmigrant(id)
@@ -139,7 +146,7 @@ func immigrant(id int, fh *hall, done chan bool) {
 func judge(fh *hall) {
 	prevImmigrants := 0
 	for {
-		time.Sleep(time.Duration(rand.Intn(4500)) * time.Millisecond)	//In transit.
+		time.Sleep(time.Duration(rand.Intn(10)) * time.Millisecond)	//In transit.
 		fh.enterJudge(prevImmigrants)
 		fh.confirm()
 		prevImmigrants = fh.leaveJudge()
@@ -149,9 +156,8 @@ func judge(fh *hall) {
 func spectator(id int, fh *hall, done chan bool) {
 	defer func(){done <- true}()
 	
-	time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)	//In transit.
+	time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)	//In transit.
 	fh.enterSpectator(id)
-	time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)	//Find way to spectator area.
 	fh.spectate(id)
 	fh.leaveSpectator(id)
 }

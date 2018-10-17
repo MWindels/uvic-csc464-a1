@@ -9,6 +9,8 @@
 #include "cpp/shared/parse.hpp"
 #include "cpp/shared/semaphore.hpp"
 
+typedef std::chrono::steady_clock testing_clock;
+
 std::mutex output_mutex;
 
 class hall{
@@ -60,7 +62,12 @@ private:
 //----------Immigrant Functions----------
 
 void hall::enter_immigrant(int id){
+	//testing_clock::time_point start = testing_clock::now();
 	std::unique_lock lk(try_enter);
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
 	
 	++entered;
 	
@@ -70,11 +77,11 @@ void hall::enter_immigrant(int id){
 }
 
 void hall::check_in(int id){
-	checked_in.signal();
-	
 	output_mutex.lock();
 	std::cout << "(Immigrant " << id << ") Checks in.\n";
 	output_mutex.unlock();
+	
+	checked_in.signal();
 }
 
 void hall::swear(int id){
@@ -123,10 +130,14 @@ void hall::confirm(){
 	std::cout << "(The Judge) Begins the confirmation process.\n";
 	output_mutex.unlock();
 	
+	//testing_clock::time_point start = testing_clock::now();
 	for(int i = 0; i < entered; ++i){
 		swear_oath.signal();
 		certification.wait();
 	}
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
 }
 
 int hall::leave_judge(){
@@ -147,7 +158,12 @@ int hall::leave_judge(){
 //----------Spectator Functions----------
 
 void hall::enter_spectator(int id){
+	//testing_clock::time_point start = testing_clock::now();
 	std::unique_lock lk(try_enter);
+	
+	/*output_mutex.lock();
+	std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
+	output_mutex.unlock();*/
 	
 	output_mutex.lock();
 	std::cout << "(Spectator " << id << ") Arrives.\n";
@@ -159,7 +175,7 @@ void hall::spectate(int id){
 	std::cout << "(Spectator " << id << ") Spectates.\n";
 	output_mutex.unlock();
 	
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 7500));
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 100));
 }
 
 void hall::leave_spectator(int id){
@@ -173,9 +189,9 @@ void hall::leave_spectator(int id){
 //----------Thread Functions----------
 
 void immigrant(int id, hall& fh){
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//In transit.
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 2000));	//In transit.
 	fh.enter_immigrant(id);
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//Find way to check-in.
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 200));	//Find way to check-in.
 	fh.check_in(id);
 	fh.swear(id);
 	fh.leave_immigrant(id);
@@ -184,7 +200,7 @@ void immigrant(int id, hall& fh){
 void judge(hall& fh){
 	int prev_immigrants = 0;
 	while(true){
-		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 4500));	//In transit.
+		std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 10));	//In transit.
 		fh.enter_judge(prev_immigrants);
 		fh.confirm();
 		prev_immigrants = fh.leave_judge();
@@ -192,9 +208,8 @@ void judge(hall& fh){
 }
 
 void spectator(int id, hall& fh){
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//In transit.
+	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 2000));	//In transit.
 	fh.enter_spectator(id);
-	std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 3000));	//Find way to spectator area.
 	fh.spectate(id);
 	fh.leave_spectator(id);
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"go/shared/parse"
 )
 
@@ -52,7 +53,9 @@ func findPrimesUpTo(n int) []int {
 }
 
 func testScenario(n int) {
+	//start := time.Now()
 	primes := findPrimesUpTo(n)
+	//fmt.Printf("%d\n", time.Since(start).Nanoseconds())
 	
 	fmt.Printf("The prime numbers from two to %d:\n", n)
 	for i, prime := range primes {

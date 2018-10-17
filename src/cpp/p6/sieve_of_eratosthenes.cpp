@@ -1,10 +1,13 @@
 #include <list>
 #include <vector>
 #include <thread>
+#include <chrono>
 #include <iostream>
 #include <functional>
 #include "cpp/shared/parse.hpp"
 #include "cpp/shared/semaphore.hpp"
+
+typedef std::chrono::steady_clock testing_clock;
 
 struct shared_lists{
 	
@@ -79,7 +82,9 @@ std::vector<int> find_primes_up_to(int n){
 }
 
 void test_scenario(int n){
+	//testing_clock::time_point start = testing_clock::now();
 	std::vector<int> primes = find_primes_up_to(n);
+	//std::cout << std::chrono::duration_cast<std::chrono::nanoseconds>(testing_clock::now() - start).count() << "\n";
 	
 	std::cout << "The prime numbers from two to " << n << "\n";
 	for(auto i = primes.begin(); i != primes.end(); ++i){
